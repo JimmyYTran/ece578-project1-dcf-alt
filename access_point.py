@@ -34,13 +34,13 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
         if (stationA.is_xmitting() and stationB.is_xmitting()):
             # Move currentSlot past collision slots to "skip" the collision
             if (stationA.counter < stationB.counter):
+                currentSlot += stationA.counter
                 stationA.skip_counter(stationA.counter)
                 stationB.skip_counter(stationA.counter)
-                currentSlot += stationA.counter
             else:
+                currentSlot += stationB.counter
                 stationA.skip_counter(stationB.counter)
                 stationB.skip_counter(stationB.counter)
-                currentSlot += stationB.counter
 
             # Mark the current transmission as a collision for each station
             stationA.collision_flag = True
@@ -52,17 +52,17 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
                 stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
                 # "Skip" ahead to the end of A's transmission
+                currentSlot += stationA.counter
                 stationA.skip_counter(stationA.counter)
                 stationB.skip_counter(stationA.counter)
-                currentSlot += stationA.counter
                 stationA.update_status()
                 stationB.update_status()
             elif (stationB.status == StationStatus.SENDING):
                 stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
                 # "Skip" ahead to the end of B's transmission
+                currentSlot += stationB.counter
                 stationA.skip_counter(stationB.counter)
                 stationB.skip_counter(stationB.counter)
-                currentSlot += stationB.counter
                 stationA.update_status()
                 stationB.update_status()

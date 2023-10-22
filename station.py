@@ -4,7 +4,7 @@ from parameters import *
 
 class Station:
 
-    def __init__(self, name, lam):
+    def __init__(self, name, lam, test_frames):
         self.successes = 0
         self.collisions = 0
         self.collision_flag = False
@@ -12,22 +12,26 @@ class Station:
         self.counter = DIFS
         self.backoff = 0
         self.name = name
-        self.frames = []
+        self.frames = test_frames
         self.frame_index = 0
         self.status = StationStatus.FREE
         self.lam = lam
 
+        '''
         running_sum = 0
         avg_slot_arrival = (1/self.lam)/SLOT_DURATION
         while running_sum < MAX_SIMULATION_SLOTS:
             running_sum += np.random.poisson(lam=avg_slot_arrival)
             self.frames.append(running_sum)
+        '''
 
     '''
     Update the status of the station to new_status, and reset counters as needed
     '''
     def switch_to_status(self, new_status):
-        self.status = new_status
+        if (self.status != StationStatus.DONE):
+            self.status = new_status
+
         if new_status == StationStatus.SENSING:
             self.counter = DIFS
         elif new_status == StationStatus.WAITING_FOR_NAV:
@@ -79,10 +83,8 @@ class Station:
             if self.counter == 0:
                 if self.collision_flag:
                     self.update_on_collision()
-                    self.switch_to_status(StationStatus.SENSING)
                 else:
                     self.update_on_success()
-                    self.switch_to_status(StationStatus.FREE)
 
     '''
     Skip forward a set amount of slots. 
@@ -108,12 +110,13 @@ class Station:
         self.get_frame_if_available()
 
     '''
-    On collision, increment collisions and double the contention window.
+    On collision, increment collisions and double the contention window. Return to sensing and retry.
     '''
     def update_on_collision(self):
         self.collisions += 1
         self.update_CW()
         self.collision_flag = False
+        self.switch_to_status(StationStatus.SENSING)
 
     '''
     Double the size of the station's contention window.
@@ -129,5 +132,6 @@ class Station:
     def get_frame_if_available(self):
         if (self.frame_index < len(self.frames)-1):
             self.frame_index += 1
+            self.switch_to_status(StationStatus.FREE)
         else:
             self.switch_to_status(StationStatus.DONE)

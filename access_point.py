@@ -1,120 +1,68 @@
 from random import randrange
 from parameters import *
+from station import Station
+from station_status import StationStatus
 
-def csmaCA(arrivalsA, arrivalsB):
-    successesA = 0
-    successesB = 0
-    collisions = 0
+def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
 
-    i = 0               # Index for arrivals from A
-    j = 0               # Index for arrivals from B
     currentSlot = 0
-    cwA = DEFAULT_CW
-    cwB = DEFAULT_CW
-    difsA = DIFS
-    difsB = DIFS
-    backoffA = 0
-    backoffB = 0
-    isSensingA = False  # Is station A sensing the channel?
-    isSensingB = False  # Is station B sensing the channel?
 
     # Figure out which station starts first
-    if (arrivalsA[i] < arrivalsB[j]):
-        currentSlot = arrivalsA[i]
+    if (stationA.frames[stationA.frame_index] < stationB.frames[stationB.frame_index]):
+        currentSlot = stationA.frames[stationA.frame_index]
     else:
-        currentSlot = arrivalsB[j]
+        currentSlot = stationB.frames[stationB.frame_index]
 
-    while(currentSlot < MAX_SIMULATION_SLOTS and (i < len(arrivalsA) or j < len(arrivalsB))):
+    while(currentSlot < MAX_SIMULATION_SLOTS and (stationA.status != StationStatus.DONE or stationB.status != StationStatus.DONE)):
         
-        # If a station is not currently sensing, check if they have a frame to send
-        if (not isSensingA and arrivalsA[i] <= currentSlot):
-            isSensingA = True
-            backoffA = randrange(cwA)
-        if (not isSensingB and arrivalsB[j] <= currentSlot):
-            isSensingB = True
-            backoffB = randrange(cwB)
+        # If a station is free, check if they have a frame to send
+        if (stationA.status == StationStatus.FREE and stationA.frames[stationA.frame_index] <= currentSlot):
+            stationA.switch_to_status(StationStatus.SENSING)
+        if (stationB.status == StationStatus.FREE and stationB.frames[stationB.frame_index] <= currentSlot):
+            stationB.switch_to_status(StationStatus.SENSING)
 
-        if (isSensingA):
-            # Wait for difs slots. After waiting difs slots, decrement backoff counter
-            if (difsA > 0):
-                difsA = difsA - 1
-            elif (backoffA > 0):
-                backoffA = backoffA - 1
-
-            # Check if A is ready to attempt transmission
-            if (difsA == 0 and backoffA == 0):
-                isSensingA = False
-
-        if (isSensingB):
-            # Wait for difs slots. After waiting difs slots, decrement backoff counter
-            if (difsB > 0):
-                difsB = difsB - 1
-            elif (backoffB > 0):
-                backoffB = backoffB - 1
-
-            # Check if B is ready to attempt transmission
-            if (difsB == 0 and backoffB == 0):
-                isSensingB = False
-
-        # Move forward a slot (either A or B is sensing, or nothing happened)
+        # "Move forward a slot" and check what A and B should do
+        stationA.update_counters()
+        stationB.update_counters()
         currentSlot += 1
 
-        if (difsA == 0 and backoffA == 0 and difsB == 0 and backoffB == 0):
-            # If backoffs match, then there is a collision
-            currentSlot += FRAME_SIZE_IN_SLOTS + SIFS + ACK
+        # Switch states for A and B depending on status and counter values
+        stationA.update_status()
+        stationB.update_status()
 
-            # Make sure we haven't exceeded simulation time
-            if (currentSlot < MAX_SIMULATION_SLOTS):
-                collisions += 1
+        # Check if A and/or B try to start transmitting
+        if (stationA.is_xmitting() and stationB.is_xmitting()):
+            # Move currentSlot past collision slots to "skip" the collision
+            if (stationA.counter < stationB.counter):
+                stationA.skip_counter(stationA.counter)
+                stationB.skip_counter(stationA.counter)
+                currentSlot += stationA.counter
+            else:
+                stationA.skip_counter(stationB.counter)
+                stationB.skip_counter(stationB.counter)
+                currentSlot += stationB.counter
 
-                # Reset DIFS counter for both A and B
-                difsA = DIFS
-                difsB = DIFS
+            # Mark the current transmission as a collision for each station
+            stationA.collision_flag = True
+            stationB.collision_flag = True
+            stationA.update_status()
+            stationB.update_status()
+        elif (not is_hidden_terminals):
+            if (stationA.status == StationStatus.SENDING):
+                stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-                # Double contention windows for both A and B
-                if (cwA < CW_MAX):
-                    cwA = cwA * 2
-                if (cwB < CW_MAX):
-                    cwB = cwB * 2
-        elif (difsA == 0 and backoffA == 0):
-            # Only A gets to transmit and the channel is reserved until then
-            currentSlot += FRAME_SIZE_IN_SLOTS + SIFS + ACK
+                # "Skip" ahead to the end of A's transmission
+                stationA.skip_counter(stationA.counter)
+                stationB.skip_counter(stationA.counter)
+                currentSlot += stationA.counter
+                stationA.update_status()
+                stationB.update_status()
+            elif (stationB.status == StationStatus.SENDING):
+                stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-            # Make sure we haven't exceeded simulation time
-            if (currentSlot < MAX_SIMULATION_SLOTS):
-                successesA += 1
-                i += 1
-
-                # Reset both DIFS counters (in case DIFS period for B was interrupted)
-                difsA = DIFS
-                difsB = DIFS
-
-                # Reset contention window for A
-                cwA = DEFAULT_CW
-        elif (difsB == 0 and backoffB == 0):
-            # Only B gets to transmit and the channel is reserved until then
-            currentSlot += FRAME_SIZE_IN_SLOTS + SIFS + ACK
-
-            # Make sure we haven't exceeded simulation time
-            if (currentSlot < MAX_SIMULATION_SLOTS):
-                successesB += 1
-                j += 1
-
-                # Reset both DIFS counters (in case DIFS period for A was interrupted)
-                difsA = DIFS
-                difsB = DIFS
-
-                # Reset contention window for B
-                cwB = DEFAULT_CW
-        
-        # If a station has no more arrivals, ignore that station during simulation
-        if (i >= len(arrivalsA)):
-            isSensingA = True
-            difsA = -1
-            backoffA = -1
-        if (j >= len(arrivalsB)):
-            isSensingB = True
-            difsB = -1
-            backoffB = -1
-            
-    return successesA, successesB, collisions
+                # "Skip" ahead to the end of B's transmission
+                stationA.skip_counter(stationB.counter)
+                stationB.skip_counter(stationB.counter)
+                currentSlot += stationB.counter
+                stationA.update_status()
+                stationB.update_status()

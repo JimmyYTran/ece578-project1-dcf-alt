@@ -17,8 +17,12 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
         
         # If a station is free, check if they have a frame to send
         if (stationA.status == StationStatus.FREE and stationA.frames[stationA.frame_index] <= currentSlot):
+            print("Station A found a frame: " + str(stationA.frames[stationA.frame_index]))
+            print("Current slot: " + str(currentSlot) + '\n')
             stationA.switch_to_status(StationStatus.SENSING)
         if (stationB.status == StationStatus.FREE and stationB.frames[stationB.frame_index] <= currentSlot):
+            print("Station B found a frame: " + str(stationB.frames[stationB.frame_index]))
+            print("Current slot: " + str(currentSlot) + '\n')
             stationB.switch_to_status(StationStatus.SENSING)
 
         # "Move forward a slot" and check what A and B should do
@@ -35,8 +39,8 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
             # Move currentSlot past collision slots to "skip" the collision
             if (stationA.counter < stationB.counter):
                 currentSlot += stationA.counter
-                stationA.skip_counter(stationA.counter)
                 stationB.skip_counter(stationA.counter)
+                stationA.skip_counter(stationA.counter)
             else:
                 currentSlot += stationB.counter
                 stationA.skip_counter(stationB.counter)
@@ -53,16 +57,16 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
 
                 # "Skip" ahead to the end of A's transmission
                 currentSlot += stationA.counter
-                stationA.skip_counter(stationA.counter)
                 stationB.skip_counter(stationA.counter)
-                stationA.update_status()
                 stationB.update_status()
+                stationA.skip_counter(stationA.counter)
+                stationA.update_status()
             elif (stationB.status == StationStatus.SENDING):
                 stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
                 # "Skip" ahead to the end of B's transmission
                 currentSlot += stationB.counter
                 stationA.skip_counter(stationB.counter)
-                stationB.skip_counter(stationB.counter)
                 stationA.update_status()
+                stationB.skip_counter(stationB.counter)
                 stationB.update_status()

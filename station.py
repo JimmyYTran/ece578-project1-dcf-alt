@@ -39,7 +39,8 @@ class Station:
         elif new_status == StationStatus.BACKOFF:
             # Generate a new backoff unless still counting down from a previous contention period
             if (self.backoff == 0):
-                self.backoff = np.random.randint(0, self.curr_CW-1)
+                # numpy's randint -> Return random integers from low (inclusive) to high (exclusive).
+                self.backoff = np.random.randint(0, self.curr_CW)
                 if (self.backoff == 0):
                     self.status = StationStatus.SENDING
         elif self.status == StationStatus.SENDING:

@@ -51,6 +51,12 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
             stationB.collision_flag = True
             stationA.update_status()
             stationB.update_status()
+        elif (is_hidden_terminals and is_ap_sending_ack([stationA, stationB])):
+            # For special case in hidden terminals when frame is sent during ack
+            if (stationA.status == StationStatus.SENDING):
+                stationA.frame_sent_while_busy_flag = True
+            elif (stationB.status == StationStatus.SENDING):
+                stationB.frame_sent_while_busy_flag = True
         elif (not is_hidden_terminals):
             if (stationA.status == StationStatus.SENDING):
                 stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
@@ -70,3 +76,11 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs):
                 stationA.update_status()
                 stationB.skip_counter(stationB.counter)
                 stationB.update_status()
+
+'''
+Check if the ap is sending an ack. Used during Hidden Terminals special case.
+'''
+def is_ap_sending_ack(stations):
+    if (any([s.status == StationStatus.WAITING_FOR_ACK and s.collision_flag == False for s in stations])):
+        return True
+    return False

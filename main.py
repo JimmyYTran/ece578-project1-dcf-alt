@@ -4,12 +4,12 @@ from station import Station
 
 def main():
     arrivalsA = [10, 400, 500, 600, 700, 800, 5000, 30000000]
-    arrivalsB = [10, 100, 300, 400, 500, 600, 30000000]
+    arrivalsB = [31, 300, 400, 500, 600, 30000000]
 
     stationA = Station('A', LAMBDAS[0], arrivalsA)
     stationB = Station('B', LAMBDAS[0], arrivalsB)
 
-    csmaCA(stationA, stationB, False, False)
+    csmaCA(stationA, stationB, True, False)
 
     print("\nCSMA with Collision Avoidance")
     print("-----------------------------------------------------------------")

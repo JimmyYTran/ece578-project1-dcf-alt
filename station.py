@@ -8,6 +8,7 @@ class Station:
         self.successes = 0
         self.collisions = 0
         self.collision_flag = False
+        self.frame_sent_while_busy_flag = False
         self.curr_CW = DEFAULT_CW
         self.counter = DIFS
         self.backoff = 0
@@ -86,6 +87,8 @@ class Station:
             if self.counter == 0:
                 if self.collision_flag:
                     self.update_on_collision()
+                elif self.frame_sent_while_busy_flag:
+                    self.update_on_lost_frame()
                 else:
                     self.update_on_success()
 
@@ -119,6 +122,16 @@ class Station:
         self.collisions += 1
         self.update_CW()
         self.collision_flag = False
+        self.frame_sent_while_busy_flag = False
+        self.switch_to_status(StationStatus.SENSING)
+
+    '''
+    For Hidden Terminals special case where one station xmits during another station's ack.
+    This is not a collision, but the transmission should not be considered a success either.
+    '''
+    def update_on_lost_frame(self):
+        self.update_CW()
+        self.frame_sent_while_busy_flag = False
         self.switch_to_status(StationStatus.SENSING)
 
     '''

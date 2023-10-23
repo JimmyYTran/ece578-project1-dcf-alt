@@ -1,5 +1,6 @@
 import numpy as np
 from station_status import StationStatus
+from vcs_status import VCSStatus
 from parameters import *
 
 class Station:
@@ -7,8 +8,6 @@ class Station:
     def __init__(self, name, lam, test_frames):
         self.successes = 0
         self.collisions = 0
-        self.collision_flag = False
-        self.frame_sent_while_busy_flag = False
         self.curr_CW = DEFAULT_CW
         self.counter = DIFS
         self.backoff = 0
@@ -17,6 +16,12 @@ class Station:
         self.frame_index = 0
         self.status = StationStatus.FREE
         self.lam = lam
+
+        self.is_hidden_terminals = False
+        self.is_vcs_enabled = False
+        self.collision_flag = False
+        self.frame_sent_while_ack_flag = False
+        self.vcs_status = VCSStatus.NONE
 
         # TODO: Fix this
         '''
@@ -28,30 +33,44 @@ class Station:
         '''
 
     '''
-    Update the status of the station to new_status, and reset counters as needed
+    Update the status of the station to new_status, and reset counters as needed.
+    The station's possible statuses may change depending on the channel topology and whether vcs is enabled.
     '''
     def switch_to_status(self, new_status):
         if (self.status != StationStatus.DONE):
             self.status = new_status
 
-        if new_status == StationStatus.SENSING:
-            self.counter = DIFS
-        elif new_status == StationStatus.WAITING_FOR_NAV:
-            self.counter = FRAME_SIZE_IN_SLOTS + SIFS + ACK
-        elif new_status == StationStatus.BACKOFF:
-            # Generate a new backoff unless still counting down from a previous contention period
-            if (self.backoff == 0):
-                # numpy's randint -> Return random integers from low (inclusive) to high (exclusive).
-                self.backoff = np.random.randint(0, self.curr_CW)
-                if (self.backoff == 0):
-                    self.status = StationStatus.SENDING
-                    self.counter = FRAME_SIZE_IN_SLOTS
-        elif self.status == StationStatus.SENDING:
-            self.counter = FRAME_SIZE_IN_SLOTS
-        elif self.status == StationStatus.WAITING_FOR_SIFS:
-            self.counter = SIFS
-        elif self.status == StationStatus.WAITING_FOR_ACK:
-            self.counter = ACK
+            if new_status == StationStatus.SENSING:
+                self.counter = DIFS
+            elif new_status == StationStatus.WAITING_FOR_NAV:
+                if self.is_hidden_terminals and self.is_vcs_enabled:
+                    self.counter = CTS + SIFS + FRAME_SIZE_IN_SLOTS + SIFS + ACK
+                elif self.is_vcs_enabled:
+                    self.counter = RTS + SIFS + CTS + SIFS + FRAME_SIZE_IN_SLOTS + SIFS + ACK
+                else:
+                    self.counter = FRAME_SIZE_IN_SLOTS + SIFS + ACK
+            elif new_status == StationStatus.BACKOFF:
+                # Generate a new backoff unless still counting down from a previous contention period
+                if self.backoff == 0:
+                    # numpy's randint -> Return random integers from low (inclusive) to high (exclusive).
+                    self.backoff = np.random.randint(0, self.curr_CW)
+                    if self.backoff == 0:
+                        if self.is_vcs_enabled:
+                            self.status = StationStatus.SENDING_RTS
+                            self.counter = RTS
+                        else:
+                            self.status = StationStatus.SENDING
+                            self.counter = FRAME_SIZE_IN_SLOTS
+            elif new_status == StationStatus.SENDING_RTS:
+                self.counter = RTS
+            elif new_status == StationStatus.WAITING_FOR_CTS:
+                self.counter = CTS
+            elif new_status == StationStatus.SENDING:
+                self.counter = FRAME_SIZE_IN_SLOTS
+            elif new_status == StationStatus.WAITING_FOR_SIFS:
+                self.counter = SIFS
+            elif new_status == StationStatus.WAITING_FOR_ACK:
+                self.counter = ACK
 
     '''
     Decrements the station's counters based on its state (moves forward a slot).
@@ -76,18 +95,40 @@ class Station:
                 self.switch_to_status(StationStatus.FREE)
         elif self.status == StationStatus.BACKOFF:
             if self.backoff == 0:
-                self.switch_to_status(StationStatus.SENDING)
+                if self.is_vcs_enabled:
+                    self.vcs_status = VCSStatus.REQUEST_TO_SEND
+                    self.switch_to_status(StationStatus.SENDING_RTS)
+                else:
+                    self.switch_to_status(StationStatus.SENDING)
+        elif self.status == StationStatus.SENDING_RTS:
+            if self.counter == 0:
+                self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
+        elif self.status == StationStatus.WAITING_FOR_CTS:
+            if self.counter == 0:
+                if self.collision_flag:
+                    self.update_on_collision()
+                else:
+                    self.vcs_status = VCSStatus.CLEAR_TO_SEND
+                    self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
         elif self.status == StationStatus.SENDING:
             if self.counter == 0:
+                if self.is_vcs_enabled:
+                    self.vcs_status = VCSStatus.NONE
                 self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
         elif self.status == StationStatus.WAITING_FOR_SIFS:
             if self.counter == 0:
-                self.switch_to_status(StationStatus.WAITING_FOR_ACK)
+                if not self.is_vcs_enabled or self.vcs_status == VCSStatus.NONE:
+                    self.switch_to_status(StationStatus.WAITING_FOR_ACK)
+                else:
+                    if self.vcs_status == VCSStatus.REQUEST_TO_SEND:
+                        self.switch_to_status(StationStatus.WAITING_FOR_CTS)
+                    elif self.vcs_status == VCSStatus.CLEAR_TO_SEND:
+                        self.switch_to_status(StationStatus.SENDING)               
         elif self.status == StationStatus.WAITING_FOR_ACK:
             if self.counter == 0:
                 if self.collision_flag:
                     self.update_on_collision()
-                elif self.frame_sent_while_busy_flag:
+                elif self.frame_sent_while_ack_flag:
                     self.update_on_lost_frame()
                 else:
                     self.update_on_success()
@@ -122,7 +163,7 @@ class Station:
         self.collisions += 1
         self.update_CW()
         self.collision_flag = False
-        self.frame_sent_while_busy_flag = False
+        self.frame_sent_while_ack_flag = False
         self.switch_to_status(StationStatus.SENSING)
 
     '''
@@ -131,7 +172,7 @@ class Station:
     '''
     def update_on_lost_frame(self):
         self.update_CW()
-        self.frame_sent_while_busy_flag = False
+        self.frame_sent_while_ack_flag = False
         self.switch_to_status(StationStatus.SENSING)
 
     '''

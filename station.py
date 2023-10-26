@@ -20,7 +20,6 @@ class Station:
         self.is_hidden_terminals = False
         self.is_vcs_enabled = False
         self.collision_flag = False
-        self.frame_sent_while_ack_flag = False
         self.vcs_status = VCSStatus.NONE
 
         # TODO: Fix this
@@ -56,6 +55,7 @@ class Station:
                     self.backoff = np.random.randint(0, self.curr_CW)
                     if self.backoff == 0:
                         if self.is_vcs_enabled:
+                            self.vcs_status = VCSStatus.REQUEST_TO_SEND
                             self.status = StationStatus.SENDING_RTS
                             self.counter = RTS
                         else:
@@ -128,8 +128,6 @@ class Station:
             if self.counter == 0:
                 if self.collision_flag:
                     self.update_on_collision()
-                elif self.frame_sent_while_ack_flag:
-                    self.update_on_lost_frame()
                 else:
                     self.update_on_success()
 
@@ -163,15 +161,6 @@ class Station:
         self.collisions += 1
         self.update_CW()
         self.collision_flag = False
-        self.frame_sent_while_ack_flag = False
-        self.switch_to_status(StationStatus.SENSING)
-
-    '''
-    For Hidden Terminals special case where one station xmits during another station's ack.
-    This is not a collision, but the transmission should not be considered a success either.
-    '''
-    def update_on_lost_frame(self):
-        self.update_CW()
         self.frame_sent_while_ack_flag = False
         self.switch_to_status(StationStatus.SENSING)
 

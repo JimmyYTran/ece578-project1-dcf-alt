@@ -108,7 +108,6 @@ class Station:
                 if self.collision_flag:
                     self.update_on_collision()
                 else:
-                    self.vcs_status = VCSStatus.CLEAR_TO_SEND
                     self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
         elif self.status == StationStatus.SENDING:
             if self.counter == 0:
@@ -121,6 +120,8 @@ class Station:
                     self.switch_to_status(StationStatus.WAITING_FOR_ACK)
                 else:
                     if self.vcs_status == VCSStatus.REQUEST_TO_SEND:
+                        if not self.collision_flag:
+                            self.vcs_status = VCSStatus.CLEAR_TO_SEND
                         self.switch_to_status(StationStatus.WAITING_FOR_CTS)
                     elif self.vcs_status == VCSStatus.CLEAR_TO_SEND:
                         self.switch_to_status(StationStatus.SENDING)               
@@ -142,9 +143,20 @@ class Station:
     Check if the station is transmitting. Used for detecting collisions.
     '''
     def is_xmitting(self):
-        if (self.status == StationStatus.SENDING or self.status == StationStatus.SENDING_RTS):
-            return True
-        return False
+        xmit_flag = self.status == StationStatus.SENDING or self.vcs_status == VCSStatus.REQUEST_TO_SEND
+        ht_sifs_flag = self.status == StationStatus.WAITING_FOR_SIFS and self.is_hidden_terminals
+        return xmit_flag or ht_sifs_flag
+    
+    '''
+    Check conditions when the station should have the channel reserved until the end of its transmission.
+    Assumes that checks for collision with another station have already been done.
+    Dependent on the topology being used. Not applicable to Hidden Terminals without VCS.
+    '''
+    def is_reserving_channel(self):
+        scd_flag = self.status == StationStatus.SENDING
+        scd_vcs_flag = self.status == StationStatus.SENDING_RTS and not self.is_hidden_terminals
+        ht_vcs_flag = self.status == self.is_hidden_terminals and self.vcs_status == VCSStatus.CLEAR_TO_SEND
+        return scd_flag or scd_vcs_flag or ht_vcs_flag
     
     '''
     On successful transmission, increment successes, reset contention window, and consider the next arrival.

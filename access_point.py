@@ -59,40 +59,59 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs_enabled):
             stationB.collision_flag = True
             stationA.update_status()
             stationB.update_status()
-        elif (is_hidden_terminals and is_ap_sending_ack([stationA, stationB])):
-            # For special case in hidden terminals when frame is sent during ack
-            if (stationA.status == StationStatus.SENDING):
-                stationA.collision_flag = True
-            elif (stationB.status == StationStatus.SENDING):
-                stationB.collision_flag = True
-        elif (not is_hidden_terminals):
-            if (stationA.is_xmitting()):
+        elif (is_hidden_terminals):
+            if (is_ap_sending_ack([stationA, stationB])):
+                # For special case in hidden terminals when frame is sent during ack
+                if (stationA.status == StationStatus.SENDING or stationA.status == StationStatus.SENDING_RTS):
+                    stationA.collision_flag = True
+                if (stationB.status == StationStatus.SENDING or stationB.status == StationStatus.SENDING_RTS):
+                    stationB.collision_flag = True
+            elif (is_ap_sending_cts([stationA, stationB])):
+                # For special case when one station send RTS right as AP sends CTS
+                # TODO: How to get this rare case to repeat behavior properly until it hears a CTS?
+                maybe make a new vcsstatus?
+                if (stationA.status == StationStatus.SENDING_RTS):
+                    stationA.collision_flag = True
+                if (stationB.status == StationStatus.SENDING_RTS):
+                    stationB.collision_flag = True
+        elif (is_vcs_enabled or not is_hidden_terminals):
+            if (stationA.is_reserving_channel()):
                 if (stationB.status != StationStatus.WAITING_FOR_NAV):
                     stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
                 # "Skip" ahead to the end of A's transmission
-                temp_counter = stationA.counter
-                current_slot += temp_counter
-                stationB.skip_counter(temp_counter)
-                stationB.update_status()
-                stationA.skip_counter(temp_counter)
-                stationA.update_status()
-            elif (stationB.is_xmitting()):
+                if (stationA.status == StationStatus.SENDING):
+                    temp_counter = stationA.counter
+                    current_slot += temp_counter
+                    stationB.skip_counter(temp_counter)
+                    stationB.update_status()
+                    stationA.skip_counter(temp_counter)
+                    stationA.update_status()
+            elif (stationB.is_reserving_channel()):
                 if (stationA.status != StationStatus.WAITING_FOR_NAV):
                     stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
                 # "Skip" ahead to the end of B's transmission
-                temp_counter = stationB.counter
-                current_slot += temp_counter
-                stationA.skip_counter(temp_counter)
-                stationA.update_status()
-                stationB.skip_counter(temp_counter)
-                stationB.update_status()
+                if (stationB.status == StationStatus.SENDING):
+                    temp_counter = stationB.counter
+                    current_slot += temp_counter
+                    stationA.skip_counter(temp_counter)
+                    stationA.update_status()
+                    stationB.skip_counter(temp_counter)
+                    stationB.update_status()
 
 '''
 Check if the ap is sending an ack. Used during Hidden Terminals special case.
 '''
 def is_ap_sending_ack(stations):
     if (any([s.status == StationStatus.WAITING_FOR_ACK and s.collision_flag == False for s in stations])):
+        return True
+    return False
+
+'''
+Check if the ap is sending cts. Used during Hidden Terminals VCS special case.
+'''
+def is_ap_sending_cts(stations):
+    if (any([s.status == StationStatus.WAITING_FOR_CTS and s.collision_flag == False for s in stations])):
         return True
     return False

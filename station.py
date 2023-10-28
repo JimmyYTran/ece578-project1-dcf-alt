@@ -20,6 +20,7 @@ class Station:
         self.is_hidden_terminals = False
         self.is_vcs_enabled = False
         self.collision_flag = False
+        self.missed_cts_flag = False
         self.vcs_status = VCSStatus.NONE
 
         # TODO: Fix this
@@ -106,6 +107,7 @@ class Station:
         elif self.status == StationStatus.WAITING_FOR_CTS:
             if self.counter == 0:
                 if self.collision_flag:
+                    self.vcs_status = None
                     self.update_on_collision()
                 else:
                     self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
@@ -173,7 +175,6 @@ class Station:
         self.collisions += 1
         self.update_CW()
         self.collision_flag = False
-        self.frame_sent_while_ack_flag = False
         self.switch_to_status(StationStatus.SENSING)
 
     '''

@@ -1,6 +1,7 @@
 from random import randrange
 from parameters import *
 from station_status import StationStatus
+from vcs_status import VCSStatus
 
 def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs_enabled):
 
@@ -69,36 +70,41 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs_enabled):
             elif (is_ap_sending_cts([stationA, stationB])):
                 # For special case when one station send RTS right as AP sends CTS
                 # TODO: How to get this rare case to repeat behavior properly until it hears a CTS?
-                maybe make a new vcsstatus?
-                if (stationA.status == StationStatus.SENDING_RTS):
-                    stationA.collision_flag = True
-                if (stationB.status == StationStatus.SENDING_RTS):
-                    stationB.collision_flag = True
+                if (stationA.vcs_status == VCSStatus.CLEAR_TO_SEND):
+                    if (stationB.status == StationStatus.SENDING_RTS):
+                        stationB.collision_flag = True
+                        stationB.missed_cts_flag = True
+                    else:
+                        stationB.missed_cts_flag = False
+                elif (stationB.vcs_status == VCSStatus.CLEAR_TO_SEND):
+                    if (stationA.status == StationStatus.SENDING_RTS):
+                        stationA.collision_flag = True
+                        stationA.missed_cts_flag = True 
+                    else:
+                        stationA.missed_cts_flag = False
         elif (is_vcs_enabled or not is_hidden_terminals):
-            if (stationA.is_reserving_channel()):
+            if (stationA.is_reserving_channel() and not stationB.missed_cts_flag):
                 if (stationB.status != StationStatus.WAITING_FOR_NAV):
                     stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-                # "Skip" ahead to the end of A's transmission
-                if (stationA.status == StationStatus.SENDING):
-                    temp_counter = stationA.counter
-                    current_slot += temp_counter
-                    stationB.skip_counter(temp_counter)
-                    stationB.update_status()
-                    stationA.skip_counter(temp_counter)
-                    stationA.update_status()
-            elif (stationB.is_reserving_channel()):
+                # At this point, A and B will not collide, so we skip forward until A's status changes
+                temp_counter = stationA.counter
+                current_slot += temp_counter
+                stationB.skip_counter(temp_counter)
+                stationB.update_status()
+                stationA.skip_counter(temp_counter)
+                stationA.update_status()
+            elif (stationB.is_reserving_channel() and not stationA.missed_cts_flag):
                 if (stationA.status != StationStatus.WAITING_FOR_NAV):
                     stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-                # "Skip" ahead to the end of B's transmission
-                if (stationB.status == StationStatus.SENDING):
-                    temp_counter = stationB.counter
-                    current_slot += temp_counter
-                    stationA.skip_counter(temp_counter)
-                    stationA.update_status()
-                    stationB.skip_counter(temp_counter)
-                    stationB.update_status()
+                # At this point, A and B will not collide, so we skip forward until B's status changes
+                temp_counter = stationB.counter
+                current_slot += temp_counter
+                stationA.skip_counter(temp_counter)
+                stationA.update_status()
+                stationB.skip_counter(temp_counter)
+                stationB.update_status()
 
 '''
 Check if the ap is sending an ack. Used during Hidden Terminals special case.

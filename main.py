@@ -9,7 +9,7 @@ def main():
     stationA = Station('A', LAMBDAS[0], arrivalsA)
     stationB = Station('B', LAMBDAS[0], arrivalsB)
 
-    csmaCA(stationA, stationB, True, False)
+    csmaCA(stationA, stationB, True, True)
 
     print("\nCSMA with Collision Avoidance")
     print("-----------------------------------------------------------------")

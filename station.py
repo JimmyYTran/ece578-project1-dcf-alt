@@ -5,14 +5,14 @@ from parameters import *
 
 class Station:
 
-    def __init__(self, name, lam, test_frames):
+    def __init__(self, name, lam):
         self.successes = 0
         self.collisions = 0
         self.curr_CW = DEFAULT_CW
         self.counter = DIFS
         self.backoff = 0
         self.name = name
-        self.frames = test_frames
+        self.frames = []
         self.frame_index = 0
         self.status = StationStatus.FREE
         self.lam = lam
@@ -23,14 +23,11 @@ class Station:
         self.missed_cts_flag = False
         self.vcs_status = VCSStatus.NONE
 
-        # TODO: Fix this
-        '''
         running_sum = 0
         avg_slot_arrival = (1/self.lam)/SLOT_DURATION
         while running_sum < MAX_SIMULATION_SLOTS:
             running_sum += np.random.poisson(lam=avg_slot_arrival)
             self.frames.append(running_sum)
-        '''
 
     '''
     Update the status of the station to new_status, and reset counters as needed.
@@ -148,7 +145,7 @@ class Station:
     '''
     def is_xmitting(self):
         xmit_flag = self.status == StationStatus.SENDING or self.vcs_status == VCSStatus.REQUEST_TO_SEND
-        ht_sifs_flag = self.status == StationStatus.WAITING_FOR_SIFS and self.is_hidden_terminals
+        ht_sifs_flag = self.status == StationStatus.WAITING_FOR_SIFS and self.is_hidden_terminals and self.vcs_status == VCSStatus.NONE
         return xmit_flag or ht_sifs_flag
     
     '''

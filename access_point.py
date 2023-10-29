@@ -24,12 +24,8 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs_enabled):
         
         # If a station is free, check if they have a frame to send
         if (stationA.status == StationStatus.FREE and stationA.frames[stationA.frame_index] <= current_slot):
-            print("Station A found a frame: " + str(stationA.frames[stationA.frame_index]))
-            print("Current slot: " + str(current_slot) + '\n')
             stationA.switch_to_status(StationStatus.SENSING)
         if (stationB.status == StationStatus.FREE and stationB.frames[stationB.frame_index] <= current_slot):
-            print("Station B found a frame: " + str(stationB.frames[stationB.frame_index]))
-            print("Current slot: " + str(current_slot) + '\n')
             stationB.switch_to_status(StationStatus.SENSING)
 
         # "Move forward a slot" and check what A and B should do

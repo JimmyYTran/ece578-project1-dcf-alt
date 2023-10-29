@@ -60,51 +60,54 @@ def csmaCA(stationA, stationB, is_hidden_terminals, is_vcs_enabled):
             stationB.collision_flag = True
             stationA.update_status()
             stationB.update_status()
-        elif (is_hidden_terminals):
-            if (is_ap_sending_ack([stationA, stationB])):
+        else:
+            if (is_hidden_terminals and is_ap_sending_ack([stationA, stationB])):
                 # For special case in hidden terminals when frame is sent during ack
                 if (stationA.status == StationStatus.SENDING or stationA.status == StationStatus.SENDING_RTS):
                     stationA.collision_flag = True
                 if (stationB.status == StationStatus.SENDING or stationB.status == StationStatus.SENDING_RTS):
                     stationB.collision_flag = True
-            elif (is_ap_sending_cts([stationA, stationB])):
+            elif (is_hidden_terminals and is_ap_sending_cts([stationA, stationB])):
                 # For special case when one station send RTS right as AP sends CTS
-                # TODO: How to get this rare case to repeat behavior properly until it hears a CTS?
                 if (stationA.vcs_status == VCSStatus.CLEAR_TO_SEND):
                     if (stationB.status == StationStatus.SENDING_RTS):
                         stationB.collision_flag = True
                         stationB.missed_cts_flag = True
                     else:
                         stationB.missed_cts_flag = False
+                        if (stationB.status != StationStatus.WAITING_FOR_NAV):
+                            stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
                 elif (stationB.vcs_status == VCSStatus.CLEAR_TO_SEND):
                     if (stationA.status == StationStatus.SENDING_RTS):
                         stationA.collision_flag = True
                         stationA.missed_cts_flag = True 
                     else:
                         stationA.missed_cts_flag = False
-        elif (is_vcs_enabled or not is_hidden_terminals):
-            if (stationA.is_reserving_channel() and not stationB.missed_cts_flag):
-                if (stationB.status != StationStatus.WAITING_FOR_NAV):
-                    stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
+                        if (stationA.status != StationStatus.WAITING_FOR_NAV):
+                            stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
+            elif (is_vcs_enabled or not is_hidden_terminals):
+                if (stationA.is_reserving_channel() and not stationB.missed_cts_flag):
+                    if (stationB.status != StationStatus.WAITING_FOR_NAV):
+                        stationB.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-                # At this point, A and B will not collide, so we skip forward until A's status changes
-                temp_counter = stationA.counter
-                current_slot += temp_counter
-                stationB.skip_counter(temp_counter)
-                stationB.update_status()
-                stationA.skip_counter(temp_counter)
-                stationA.update_status()
-            elif (stationB.is_reserving_channel() and not stationA.missed_cts_flag):
-                if (stationA.status != StationStatus.WAITING_FOR_NAV):
-                    stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
+                    # At this point, A and B will not collide, so we skip forward until A's status changes
+                    temp_counter = stationA.counter
+                    current_slot += temp_counter
+                    stationB.skip_counter(temp_counter)
+                    stationB.update_status()
+                    stationA.skip_counter(temp_counter)
+                    stationA.update_status()
+                elif (stationB.is_reserving_channel() and not stationA.missed_cts_flag):
+                    if (stationA.status != StationStatus.WAITING_FOR_NAV):
+                        stationA.switch_to_status(StationStatus.WAITING_FOR_NAV)
 
-                # At this point, A and B will not collide, so we skip forward until B's status changes
-                temp_counter = stationB.counter
-                current_slot += temp_counter
-                stationA.skip_counter(temp_counter)
-                stationA.update_status()
-                stationB.skip_counter(temp_counter)
-                stationB.update_status()
+                    # At this point, A and B will not collide, so we skip forward until B's status changes
+                    temp_counter = stationB.counter
+                    current_slot += temp_counter
+                    stationA.skip_counter(temp_counter)
+                    stationA.update_status()
+                    stationB.skip_counter(temp_counter)
+                    stationB.update_status()
 
 '''
 Check if the ap is sending an ack. Used during Hidden Terminals special case.

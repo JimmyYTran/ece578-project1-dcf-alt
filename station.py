@@ -106,11 +106,11 @@ class Station:
                 self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
         elif self.status == StationStatus.WAITING_FOR_CTS:
             if self.counter == 0:
-                if self.collision_flag:
-                    self.vcs_status = None
-                    self.update_on_collision()
-                else:
+                if self.vcs_status == VCSStatus.CLEAR_TO_SEND:
                     self.switch_to_status(StationStatus.WAITING_FOR_SIFS)
+                else:
+                    self.vcs_status = VCSStatus.NONE
+                    self.update_on_collision()
         elif self.status == StationStatus.SENDING:
             if self.counter == 0:
                 if self.is_vcs_enabled:
@@ -124,6 +124,8 @@ class Station:
                     if self.vcs_status == VCSStatus.REQUEST_TO_SEND:
                         if not self.collision_flag:
                             self.vcs_status = VCSStatus.CLEAR_TO_SEND
+                        else:
+                            self.vcs_status = VCSStatus.NO_AP_RESPONSE
                         self.switch_to_status(StationStatus.WAITING_FOR_CTS)
                     elif self.vcs_status == VCSStatus.CLEAR_TO_SEND:
                         self.switch_to_status(StationStatus.SENDING)               

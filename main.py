@@ -3,8 +3,8 @@ from access_point import csmaCA
 from station import Station
 
 def main():
-    arrivalsA = [10, 90, 150, 400, 500, 600, 700, 800, 5000, 30000000]
-    arrivalsB = [30, 90, 150, 200, 300, 400, 500, 600, 30000000]
+    arrivalsA = [10, 30, 50, 90, 150, 400, 500, 600, 700, 800, 5000, 30000000]
+    arrivalsB = [10, 30, 50, 90, 150, 200, 300, 400, 500, 600, 30000000]
 
     stationA = Station('A', LAMBDAS[0], arrivalsA)
     stationB = Station('B', LAMBDAS[0], arrivalsB)

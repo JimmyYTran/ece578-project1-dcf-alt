@@ -55,7 +55,7 @@ grid on; % grid lines on the plot
 xlim([0 1050])
 ylim([0.8 1.05])
 legend('Shared Collision Domain (No VCS)', 'Hidden Terminals (No VCS)','Shared Collision Domain (VCS Enabled)','Hidden Terminals (VCS Enabled)');
-% ylabel('$T$ (Kbps)');
+% ylabel('$T$ (bps)');
 % ylabel('number of collision');
 ylabel('Fairness Index');
 xlabel('$\lambda$ (frames/sec)');
